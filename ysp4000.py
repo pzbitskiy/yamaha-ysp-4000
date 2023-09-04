@@ -3,7 +3,7 @@ import time
 
 import serial
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 class YSP4000:
     STATUS_CMD_SIZE = 1+8+144+2+1
