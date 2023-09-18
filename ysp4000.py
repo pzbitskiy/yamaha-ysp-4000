@@ -22,20 +22,25 @@ class YSP4000:
             timeout=1)
 
         self.dt_data = None
-        self.on = False
+        self.on = None
         self.input = None
 
-        self.status()
-        logging.debug('DT: %s', self.dt_data)
+    def _ready(func):
+        def wrapper(self, *args, **kwargs):
+            if self.dt_data is None:
+                self.dt_data = self._status()
+                logging.debug('calling %s: DT: %s', func.__name__, self.dt_data)
+            func(self, *args, **kwargs)
+        return wrapper
 
-    def status(self):
+    def _status(self):
         data = self._communicate(b'\x11\x00\x00\x00\x03', YSP4000.STATUS_CMD_SIZE, throw=False)
         # When the power is OFF, only DT0,1,…,9 are sent to the Host.
         # not true for YSP-4000 but...
         self.on = data is not None and len(data) > (9+10+3)
-        if self.on:
-            self.dt_data = data[1+8:-3]
+        dt_data = data[1+8:-3] if self.on else None
         logging.debug('power state: %s', self.on)
+        return dt_data
 
     def close(self):
         self.ser.close()
@@ -74,6 +79,7 @@ class YSP4000:
 
         return result
 
+    @_ready
     def set_input_tv(self):
         if self.get_input() == YSP4000.INPUT_TV:
             return
@@ -81,6 +87,7 @@ class YSP4000:
         self.input = YSP4000.INPUT_TV
         return data
 
+    @_ready
     def set_input_aux1(self):
         if self.get_input() == YSP4000.INPUT_AUX1:
             return
@@ -88,36 +95,47 @@ class YSP4000:
         self.input = YSP4000.INPUT_AUX1
         return data
 
+    @_ready
     def volume_up(self):
         return self._communicate(b'\x020781E\x03', 8)
 
+    @_ready
     def volume_down(self):
         return self._communicate(b'\x020781F\x03', 8)
 
+    @_ready
     def set_dsp_cinema(self):
         return self._communicate(b'\x0207EFB\x03', 8)
 
+    @_ready
     def set_dsp_music(self):
         self._communicate(b'\x0207EE1\x03', 8)
 
+    @_ready
     def set_dsp_off(self):
         self._communicate(b'\x020789B\x03', 8)
 
+    @_ready
     def set_3beam(self):
         self._communicate(b'\x02078C4\x03', 3*8)
 
+    @_ready
     def set_5beam(self):
         self._communicate(b'\x02078C2\x03', 3*8)
 
+    @_ready
     def set_stereo(self):
         self._communicate(b'\x0207850\x03', 3*8)
 
+    @_ready
     def power_off(self):
         if not self.on:
             return
         self._communicate(b'\x020787F\x03', 8)  # powering off YSP-4000 breaks data transmission so it could return 1-8 bytes
         self.on = False
+        self.dt_data = None
 
+    @_ready
     def power_on(self):
         if self.on:
             return
