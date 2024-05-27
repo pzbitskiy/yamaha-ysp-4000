@@ -97,11 +97,11 @@ class YSP4000:
 
     @_ready
     def volume_up(self):
-        return self._communicate(b'\x020781E\x03', 8)
+        return self._communicate(b'\x020781E\x03'*5, 8)
 
     @_ready
     def volume_down(self):
-        return self._communicate(b'\x020781F\x03', 8)
+        return self._communicate(b'\x020781F\x03'*5, 8)
 
     @_ready
     def set_dsp_cinema(self):
