@@ -5,9 +5,9 @@ with open('requirements.txt', encoding='utf-8') as req_fp:
 
 
 setup(name='yamaha-ysp-4000',
-      version='0.1',
+      version='0.2',
       url='http://github.com/pzbitskiy/yamaha-ysp-4000',
       license='MIT',
-      packages=['.'],
+      packages=['ysp4000'],
       install_requires=install_requires,
       zip_safe=False)
