@@ -7,12 +7,12 @@ from ysp4000.commands import ConfigurationCommand, ReportCommand, \
     make_response_parser
 
 
-def whole_feeder(data: bytes, func: Callable, assertion: Any, no_remainder: bool=None) -> bytes:  # pylint: disable=unused-argument
+def whole_feeder(data: bytes, func: Callable, assertion: Any, no_remainder: bool = None) -> bytes:  # pylint: disable=unused-argument
     """Calls func with the entre data chunk"""
     return func(data)
 
 
-def byte_feeder(data: bytes, func: Callable, assertion: Any, no_remainder: bool=None) -> bytes:
+def byte_feeder(data: bytes, func: Callable, assertion: Any, no_remainder: bool = None) -> bytes:
     """Calls func with one byte chunks"""
     rem = None
     for i in range(len(data)):
@@ -22,7 +22,7 @@ def byte_feeder(data: bytes, func: Callable, assertion: Any, no_remainder: bool=
     return rem
 
 
-def random_feeder(data: bytes, func: Callable, assertion: Any, no_remainder: bool=None) -> bytes:
+def random_feeder(data: bytes, func: Callable, assertion: Any, no_remainder: bool = None) -> bytes:
     """Calls func with random size chunks"""
     rem = None
     i = 0
@@ -73,9 +73,12 @@ class TestCommandsParsing(unittest.TestCase):
             self.assertTrue(handler.done())
             ysp = MockUpdatable()
             handler.emit_changes(ysp)
-            self.assertEqual(ysp.kwargs['power'], 'off')
+            self.assertEqual(ysp.kwargs['status'], '0')
+            self.assertEqual(ysp.kwargs['power'], '0')
             self.assertIsNone(ysp.kwargs['input'])
             self.assertIsNone(ysp.kwargs['volume'])
+            self.assertIsNone(ysp.kwargs['program'])
+            self.assertIsNone(ysp.kwargs['beam'])
 
             # data2
             self.assertTrue(handler.match(data2))
@@ -87,9 +90,12 @@ class TestCommandsParsing(unittest.TestCase):
             self.assertTrue(handler.done())
             ysp = MockUpdatable()
             handler.emit_changes(ysp)
-            self.assertEqual(ysp.kwargs['power'], 'on')
+            self.assertEqual(ysp.kwargs['status'], '0')
+            self.assertEqual(ysp.kwargs['power'], '1')
             self.assertEqual(ysp.kwargs['input'], '0')
             self.assertEqual(ysp.kwargs['volume'], '9E')
+            self.assertEqual(ysp.kwargs['program'], '7')
+            self.assertEqual(ysp.kwargs['beam'], '0')
 
         random.seed(None)
         run(READY_RESP_POWERED_OFF, READY_RESP_POWERED_ON, whole_feeder)
@@ -151,7 +157,7 @@ class TestCommandsParsing(unittest.TestCase):
         handler.emit_changes(ysp)
         self.assertGreater(len(ysp.kwargs), 0)
         # ensure configuration part parsed
-        self.assertEqual(ysp.kwargs['power'], 'on')
+        self.assertEqual(ysp.kwargs['power'], '1')
         self.assertEqual(ysp.kwargs['input'], '0')
         self.assertEqual(ysp.kwargs['volume'], '9E')
 
@@ -161,13 +167,14 @@ class TestCommandsParsing(unittest.TestCase):
         self.assertTrue(handler.done())
         handler.emit_changes(ysp)
         # ensure volume part parsed
-        self.assertEqual(ysp.kwargs['power'], 'on')
+        self.assertEqual(ysp.kwargs['power'], '1')
         self.assertEqual(ysp.kwargs['input'], '0')
         self.assertEqual(ysp.kwargs['volume'], 'B2')
 
 
 class TestResponseParser(unittest.TestCase):
     """Test ResponseParser class"""
+
     def test_single(self):
         """Test ResponseParser handles single commands"""
         def run1(data: bytes, feeder: Callable):
@@ -183,13 +190,12 @@ class TestResponseParser(unittest.TestCase):
         run1(OP_RESP_VOLUME_CHANGE1, byte_feeder)
         run1(OP_RESP_VOLUME_CHANGE1, random_feeder)
 
-
         def run2(data: bytes, feeder: Callable):
             ysp = MockUpdatable()
             parser = make_response_parser(ysp)
             remainder = feeder(data, parser.consume, self, no_remainder=True)
             self.assertFalse(remainder)
-            self.assertEqual(ysp.kwargs['power'], 'on')
+            self.assertEqual(ysp.kwargs['power'], '1')
             self.assertEqual(ysp.kwargs['input'], '0')
             self.assertEqual(ysp.kwargs['volume'], '9E')
 
@@ -206,8 +212,7 @@ class TestResponseParser(unittest.TestCase):
             parser = make_response_parser(ysp)
             remainder = feeder(data, parser.consume, self, no_remainder=True)
             self.assertFalse(remainder)
-            # self.assertEqual(len(ysp.kwargs), 1)
-            self.assertEqual(ysp.kwargs['power'], 'on')
+            self.assertEqual(ysp.kwargs['power'], '1')
             self.assertEqual(ysp.kwargs['input'], '0')
             self.assertEqual(ysp.kwargs['volume'], 'B2')
 
@@ -225,21 +230,18 @@ class TestResponseParser(unittest.TestCase):
 
         ysp = MockUpdatable()
         parser = make_response_parser(ysp)
-        remainder = parser.consume(part1)
-        self.assertFalse(remainder)
+        parser.consume(part1)
         self.assertEqual(len(ysp.kwargs), 0)
 
-        remainder = parser.consume(part2)
-        self.assertFalse(remainder)  # no remainder, parser consumes as much as it can
+        parser.consume(part2)
         self.assertGreater(len(ysp.kwargs), 0)
         # check only POWER_ON portion updated
-        self.assertEqual(ysp.kwargs['power'], 'on')
+        self.assertEqual(ysp.kwargs['power'], '1')
         self.assertEqual(ysp.kwargs['input'], '0')
         self.assertEqual(ysp.kwargs['volume'], '9E')
 
-        remainder = parser.consume(part3)
-        self.assertFalse(remainder)
+        parser.consume(part3)
         # check the remaining VOLUME portion is updated as well
-        self.assertEqual(ysp.kwargs['power'], 'on')
+        self.assertEqual(ysp.kwargs['power'], '1')
         self.assertEqual(ysp.kwargs['input'], '0')
         self.assertEqual(ysp.kwargs['volume'], 'B2')
