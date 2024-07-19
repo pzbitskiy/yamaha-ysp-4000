@@ -1,6 +1,7 @@
 """YSP4000 serial interface commands and responses"""
 from abc import abstractmethod, ABC
 from enum import Enum
+import logging
 from typing import Dict, Callable, List, Optional, Tuple
 
 
@@ -55,6 +56,7 @@ class ReadyCommand(YspCommandIf):  # pylint: disable=too-few-public-methods
 
     @staticmethod
     def cmd(**kwargs) -> Optional[bytes]:
+        logging.debug('ready cmd: %s', ReadyCommand.CMD)
         return ReadyCommand.CMD
 
 
@@ -63,7 +65,9 @@ class ControlCommandBase(ABC):  # pylint: disable=too-few-public-methods
     @staticmethod
     def control_cmd(sw: bytes, data: bytes) -> bytes:  # pylint: disable=invalid-name
         """Constructs control cmd"""
-        return YspSerialCodes.STX.value + sw + data + YspSerialCodes.ETX.value
+        cmd = YspSerialCodes.STX.value + sw + data + YspSerialCodes.ETX.value
+        logging.debug('control cmd: %s', cmd)
+        return cmd
 
 
 class SystemCommand(YspCommandIf, ControlCommandBase):
@@ -90,8 +94,9 @@ class OperationCommand(YspCommandIf, ControlCommandBase):
                 '2': b'49',  # aux1
                 '3': b'DE',  # aux2
                 '4': b'BC',  # aux3
-                '6': b'B6',  # dock
+                '6': b'B6',  # fm
                 '7': b'7D',  # xm
+                '8': b'4B',  # fm
             }
             if (cmd := input_map.get(input_val)) is not None:
                 return ControlCommandBase.control_cmd(b'0', b'78' + cmd)
@@ -103,60 +108,50 @@ class OperationCommand(YspCommandIf, ControlCommandBase):
 
         elif (power := kwargs.get('power')):
             power_map = {
-                'on':      b'7E',
-                'off':     b'7F',
-                'standby': b'7F',
+                '0': b'7F',  # off
+                '1': b'7E',  # on
             }
             if cmd := power_map.get(power.lower()):
                 return ControlCommandBase.control_cmd(b'0', b'78' + cmd)
 
-        elif (dsp := kwargs.get('dsp')):
-            dsp_map = {
-                'spectacle':    b'F9',
-                'sci-fi':       b'FA',
-                'adventure':    b'FB',
-                'movie':        b'FB',   # default movie/cinema
-                'cinema':       b'FB',  # default movie/cinema
-                'concert':      b'E1',
-                'concert hall': b'E1',
-                'jazz':         b'EC',
-                'jazz club':    b'EC',
-                'sport':        b'F8',
-                'sports':       b'F8',
+        elif (program := kwargs.get('program')):
+            # 0: Cinema DSP Off / 1: Movie Sci-Fi / 2: Movie Spectacle / 3: Movie Adventure
+            # 4: Music Video / 5: Music Concert Hall / 6:Music Jazz Club / 7:Sports
+            program_map = {
+                '1': b'FA',
+                '2': b'F9',
+                '3': b'FB',
+                '4': b'F3',
+                '5': b'E1',
+                '6': b'EC',
+                '7': b'F8',
             }
-            extra = {}
-            for key, val in dsp_map.items():
-                if '-' in key:
-                    extra[key.replace('-', ' ')] = val
-                    extra[key.replace('-', '_')] = val
-                if ' ' in key:
-                    extra[key.replace(' ', '-')] = val
-                    extra[key.replace(' ', '_')] = val
-                if '_' in key:
-                    extra[key.replace('_', ' ')] = val
-                    extra[key.replace('_', '-')] = val
-            if extra:
-                dsp_map.update(extra)
-
-            if cmd := dsp_map.get(dsp.lower()):
+            if cmd := program_map.get(program):
                 return ControlCommandBase.control_cmd(b'0', b'7E' + cmd)
-            if dsp.lower() in ('off', 'disable'):
+            if program.lower() in ('0', 'off', 'disable'):
                 return ControlCommandBase.control_cmd(b'0', b'789B')
 
         elif (beam := kwargs.get('beam')):
+            # 0: 5Beam / 1: ST+3Beam / 2: 3Beam / 3: Stereo / 4: Target
             beam_map = {
-                '5beam':  b'C2',
-                '3beam':  b'C4',
-                'stereo': b'50',
+                '0': b'C2',
+                '1': b'C3',
+                '2': b'C4',
+                '3': b'50',
+                '5': b'C5',  # my beam
+                '6': b'C6',  # my surround
             }
-            if cmd := beam_map.get(beam.lower()):
+            if cmd := beam_map.get(beam):
                 return ControlCommandBase.control_cmd(b'0', b'78' + cmd)
+            if cmd == '4':  # 5ch stereo
+                return ControlCommandBase.control_cmd(b'0', b'7EFF')
 
         return None
 
 
 class YspResponseBase(YspResponseHandlerIf):
     """Base class for Ysp400 response parsing"""
+
     def __init__(self):
         self.buf = b''
         self.fields = {}
@@ -220,16 +215,22 @@ class ConfigurationCommand(YspResponseBase):
     START_BYTE = YspSerialCodes.DC2.value
     END_BYTE = YspSerialCodes.ETX.value
 
+    DT7_SYSTEM = 7
     DT8_POWER = 8
     DT9_INPUT = 9
     DT12_VOLUME_HIGH_NIBBLE = 12
-    DT14_VOLUME_LOW_NIBBLE = 13
+    DT13_VOLUME_LOW_NIBBLE = 13
+    DT14_PROGRAM = 14
+    DT29_BEAM = 29
 
     def __init__(self):
         super().__init__()
+        self.status: Optional[str] = None
         self.power: Optional[str] = None
         self.input: Optional[str] = None
         self.volume: Optional[str] = None
+        self.program: Optional[str] = None
+        self.beam: Optional[str] = None
 
         _ = None
         self.cmd_layout = {
@@ -252,8 +253,14 @@ class ConfigurationCommand(YspResponseBase):
         return self.cmd_layout
 
     def emit_changes(self, ysp: YspStateUpdatableIf):
-        ysp.update_state(power=self.power, input=self.input,
-                         volume=self.volume)
+        ysp.update_state(
+            status=self.status,
+            power=self.power,
+            input=self.input,
+            volume=self.volume,
+            program=self.program,
+            beam=self.beam,
+        )
 
     def _parse_len(self, data: bytes):
         """Parse variable len field"""
@@ -263,19 +270,26 @@ class ConfigurationCommand(YspResponseBase):
 
     def _parse_data(self, data: bytes):
         """Parse DT items"""
+        if len(data) > self.DT7_SYSTEM:
+            # 0: OK / 1: Busy / 2: P-Off
+            self.status = chr(data[self.DT7_SYSTEM])
         if len(data) > self.DT8_POWER:
-            power = data[self.DT8_POWER]
-            if power == ord(b'0'):
-                self.power = 'off'
-            if power == ord(b'1'):
-                self.power = 'on'
+            # 0: Off / 1: On
+            self.power = chr(data[self.DT8_POWER])
         if len(data) > self.DT9_INPUT:
             # 0: TV/STB / 1: DVD / 2: AUX1 / 3: AUX2 / 4: AUX3 / 5 :DOCK / 6 :FM / 7 :XM
             self.input = chr(data[self.DT9_INPUT])
-        if len(data) > self.DT14_VOLUME_LOW_NIBBLE:
+        if len(data) > self.DT13_VOLUME_LOW_NIBBLE:
             high = chr(data[self.DT12_VOLUME_HIGH_NIBBLE])
-            low = chr(data[self.DT14_VOLUME_LOW_NIBBLE])
+            low = chr(data[self.DT13_VOLUME_LOW_NIBBLE])
             self.volume = high + low
+        if len(data) > self.DT14_PROGRAM:
+            # 0: Cinema DSP Off / 1: Movie Sci-Fi / 2: Movie Spectacle / 3: Movie Adventure
+            # 4: Music Video / 5: Music Concert Hall / 6:Music Jazz Club / 7:Sports
+            self.program = chr(data[self.DT14_PROGRAM])
+        if len(data) > self.DT29_BEAM:
+            # 0: 5Beam / 1: ST+3Beam / 2: 3Beam / 3: Stereo / 4: Target
+            self.beam = chr(data[self.DT29_BEAM])
 
 
 class ReportCommand(YspResponseBase):
@@ -312,33 +326,28 @@ class ReportCommand(YspResponseBase):
         kwargs: Dict[str, str] = {}
         # system cmd response
         if rcmd == b'00':
-            status_map = {
-                b'00': 'ok',
-                b'01': 'busy',
-                b'02': 'standby',
-            }
-            if status := status_map.get(rdata):
-                kwargs['status'] = status
+            kwargs['status'] = chr(rdata[1])
 
         elif rcmd == b'01':
             kwargs['status'] = 'warning'
 
         elif rcmd == b'20':
-            power_map = {
-                b'00': 'off',
-                b'01': 'on',
-            }
-            if power := power_map.get(rdata):
-                kwargs['power'] = power
+            kwargs['power'] = chr(rdata[1])
 
         elif rcmd == b'21':
-            # 0: TV/STB / 1: DVD / 2: AUX1 / 3: AUX2 / 4: AUX3 / 5 :DOCK / 6 :FM / 7 :XM
             kwargs['input'] = chr(rdata[1])
 
         elif rcmd == b'26':
             high = chr(rdata[0])
             low = chr(rdata[1])
             kwargs['volume'] = high + low
+
+        elif rcmd == b'28':
+            kwargs['program'] = chr(rdata[0])
+            # surround = chr(rdata[1])
+
+        elif rcmd == b'B0':
+            kwargs['beam'] = chr(rdata[1])
 
         ysp.update_state(**kwargs)
 
