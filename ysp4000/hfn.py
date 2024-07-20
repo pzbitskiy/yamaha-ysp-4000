@@ -110,6 +110,8 @@ class StatusMap(MapperIf):
         'Standby': '2',
     }
 
+    ok = '0'
+
     def __init__(self):
         self.code_to_name: Dict[str, str] = {}
         for key, val in self.FRIENDLY_NAMES.items():

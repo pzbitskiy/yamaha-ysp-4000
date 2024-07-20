@@ -8,7 +8,7 @@ import serial_asyncio
 
 from ysp4000.commands import make_response_parser, ReadyCommand, OperationCommand, SystemCommand
 from ysp4000.hfn import make_hfn_mapper, BeamMap, InputMap, PowerMap, ProgramMap, \
-    VolumeMap
+    StatusMap, VolumeMap
 
 
 def init_logging(level=None, **kwargs):
@@ -28,7 +28,7 @@ logger = logging.getLogger('ysp')
 def _ready(func):
     """Ysp ready decorator"""
     def wrapper(self, *args, **kwargs):
-        if self.on is None:
+        if not self.ready:
             self.ser_transport.pause_reading()
             self.communicate(ReadyCommand.cmd())
             self.ser_transport.resume_reading()
@@ -38,7 +38,7 @@ def _ready(func):
     return wrapper
 
 
-class Ysp4000:
+class Ysp4000:  # pylint: disable=too-many-instance-attributes
     """Yamaha YSP4000 serial controller"""
 
     def __init__(
@@ -71,6 +71,7 @@ class Ysp4000:
         self._hfn_mapper = make_hfn_mapper()
 
         self.ser_transport = None
+        self.ready = None
 
         if verbose:
             init_logging(level=logging.DEBUG, force=True)
@@ -137,14 +138,14 @@ class Ysp4000:
             buf += read
 
         self._ser.timeout = timeout
+        logger.debug('read all %s', buf)
         self._response_parser.consume(buf)
         return buf
 
     @property
     def on(self) -> bool:
         """Returns True if YSP4000 is powered on"""
-        power_on = '1'
-        return self.state['power'] == power_on
+        return self.state['power'] == PowerMap.on
 
     @_ready
     def power_on(self):
@@ -229,8 +230,15 @@ class Ysp4000:
             if old != new:
                 self.state[key] = new
                 updates[key] = self._hfn_mapper(key, new)
+            if key == 'status' and new == StatusMap.ok:
+                self.ready = True
+
         if updates:
             logger.debug('state updated: %s', updates)
 
         if self._callback is not None:
             self._callback(**updates)
+
+    def close(self):
+        """close the serial port"""
+        self._ser.close()
