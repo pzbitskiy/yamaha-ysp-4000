@@ -10,10 +10,17 @@ from .commands import make_response_parser, ReadyCommand, OperationCommand, Syst
 from .hfn import make_hfn_mapper, BeamMap, InputMap, PowerMap, ProgramMap, VolumeMap
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%dT%H:%M:%S')
+def init_logging(level=None, **kwargs):
+    """init logging"""
+    if not level:
+        level = logging.INFO
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%dT%H:%M:%S',
+        **kwargs)
+
+
 logger = logging.getLogger('ysp')
 
 
@@ -50,7 +57,7 @@ class Ysp4000:
         self._hfn_mapper = make_hfn_mapper()
 
         if verbose:
-            logging.basicConfig(level=logging.DEBUG)
+            init_logging(level=logging.DEBUG, force=True)
 
     def start(self, event_loop) -> Coroutine:
         """Start serial port communication loop"""
