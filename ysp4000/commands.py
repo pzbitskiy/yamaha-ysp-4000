@@ -6,8 +6,7 @@ from typing import Dict, Callable, List, Optional, Tuple
 
 # Also seen these responses, support?
 # startup: system playback report b'\x02301009\x03' b'\x02301100\x03' b'\x02301001\x03'
-# power off incomplete b'\x0210200\x10  b'\x0210200\x00
-# power on: b'\x02102001\x03'
+# power off incomplete b'\x0210200\x10  b'\x0210200\x00 b'\x02102000
 
 
 logger = logging.getLogger('cmd')
