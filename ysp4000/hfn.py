@@ -56,7 +56,8 @@ class ProgramMap(MapperIf):
 
     def __init__(self):
         extra = {}
-        for key, val in self.ALIASES.items() + self.FRIENDLY_NAMES.items():
+        self.ALIASES.update(self.FRIENDLY_NAMES)
+        for key, val in self.ALIASES.items():
             key: str = key.lower()
             if '-' in key:
                 extra[key.replace('-', ' ')] = val
@@ -184,11 +185,34 @@ class VolumeMap(MapperIf):
         pass
 
     def code_to_hfn(self, code: str) -> str:
-        """Convert code to 0-99 percent value """
+        """Convert code to 0-100 percent value"""
+        num = int(code, 16)
+        if num >= 0xEE:
+            return '100'
+        if 0xB3 <= num <= 0xEE:
+            return str(num - 0xB2 + 40)
+        if 0x8C <= num <= 0xB2:
+            return str(int((num - 0x8A)/2 + 20))
+        if 0x66 <= num <= 0x8A:
+            return str(int((num - 0x62)/4 + 10))
+        if 0x2C <= num <= 0x62:
+            return str(int((num - 0x2C)/6 + 1))
+        return '0'
 
     @staticmethod
-    def convert_pct(val: int) -> bytes:
-        """Convert percent 0-99 value to 00-EE bytestring code"""
+    def convert_pct(val: int) -> str:
+        """Convert percent 0-100 value to 00-EE string code"""
+        if val <= 0:
+            return '00'
+        if 1 <= val <= 10:
+            return format(0x2C + (val-1)*6, 'X')
+        if 10 < val < 21:
+            return format(0x62 + (val-10)*4, 'X')
+        if 20 < val < 41:
+            return format(0x8A + (val-20)*2, 'X')
+        if 40 < val <= 100:
+            return format(0xB2 + (val-40)*1, 'X')
+        return 'EE'
 
 
 def make_hfn_mapper() -> Callable[[str, str], Optional[str]]:
