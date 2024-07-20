@@ -83,7 +83,9 @@ class SystemCommand(YspCommandIf, ControlCommandBase):
     """Ysp4000 system command"""
 
     @staticmethod
-    def cmd(volume: str = None, **kwargs) -> Optional[bytes]:
+    def cmd(volume: str = None, report: str = None, **kwargs) -> Optional[bytes]:
+        if report:
+            return ControlCommandBase.control_cmd(b'8', b'00' + report.encode())
         if volume is not None:
             return ControlCommandBase.control_cmd(b'8', b'30' + volume.encode())
         # others are not supported => noop

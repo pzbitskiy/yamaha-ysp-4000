@@ -90,6 +90,7 @@ class Ysp4000:
     def _connected(self):
         """Protocol callback on serial connection"""
         self._write_cmd(ReadyCommand.cmd())
+        self._write_cmd(SystemCommand.cmd(report=ReportMap.enable))
 
     def _handle(self, data):
         """Protocol callback to handle data"""
