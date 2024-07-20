@@ -119,6 +119,26 @@ class StatusMap(MapperIf):
         return self.code_to_name.get(code)
 
 
+class ReportMap(MapperIf):
+    """Report Enable codes to human-friendly names mapping
+    """
+    FRIENDLY_NAMES = {
+        'Enable':  '00',
+        'Disable': '01',
+    }
+
+    enable = '00'
+    disable= '01'
+
+    def __init__(self):
+        self.code_to_name: Dict[str, str] = {}
+        for key, val in self.FRIENDLY_NAMES.items():
+            self.code_to_name[val] = key
+
+    def code_to_hfn(self, code: str) -> str:
+        return self.code_to_name.get(code)
+
+
 class BeamMap(MapperIf):
     """Beam codes to human-friendly names mapping
     0: 5Beam / 1: ST+3Beam / 2: 3Beam / 3: Stereo / 4: Target
