@@ -10,11 +10,16 @@ from .commands import make_response_parser, ReadyCommand, OperationCommand, Syst
 from .hfn import make_hfn_mapper, BeamMap, InputMap, PowerMap, ProgramMap, VolumeMap
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%dT%H:%M:%S')
+logger = logging.getLogger('ysp')
 
 
 class Ysp4000:
     """Yamaha YSP4000 serial controller"""
+
     def __init__(
         self,
         port: str = '/dev/ttyUSB0',
@@ -45,11 +50,11 @@ class Ysp4000:
         self._hfn_mapper = make_hfn_mapper()
 
         if verbose:
-            logging.basicConfig(level=logging.DEBUG, force=True)
+            logging.basicConfig(level=logging.DEBUG)
 
     def start(self, event_loop) -> Coroutine:
         """Start serial port communication loop"""
-        logging.info('starting coroutine on serial %s', self._port)
+        logger.info('starting coroutine on serial %s', self._port)
         self._ser.port = self._port
         self._ser.open()
 
@@ -72,7 +77,7 @@ class Ysp4000:
     def _write_cmd(self, cmd: Optional[bytes]):
         """Helper function that writes optional command to serial port"""
         if cmd:
-            logging.debug('writing: %s', cmd)
+            logger.debug('send %s', cmd)
             self._ser.write(cmd)
 
     def _connected(self):
@@ -81,7 +86,7 @@ class Ysp4000:
 
     def _handle(self, data):
         """Protocol callback to handle data"""
-        logging.debug('received %s', data)
+        logger.debug('recv %s', data)
         self._response_parser.consume(data)
 
     def read_all(self) -> bytes:
@@ -163,10 +168,12 @@ class Ysp4000:
     def set_volume_pct(self, value: int):
         """Set volume to 0-99 pct"""
         val: str = VolumeMap.convert_pct(value)
+        logger.debug('set volume: %d(%s)', value, val)
         self._write_cmd(SystemCommand.cmd(volume=val))
 
     def set_volume(self, value: str):
         """Set volume to absolute value 00-EE"""
+        logger.debug('set volume: %s', value)
         self._write_cmd(SystemCommand.cmd(volume=value))
 
     def update_state(self, **kwargs):
@@ -177,6 +184,8 @@ class Ysp4000:
             if old != new:
                 self.state[key] = new
                 updates[key] = self._hfn_mapper(key, new)
+        if updates:
+            logger.debug('state updated: %s', updates)
 
         if self._callback is not None:
             self._callback(**updates)
