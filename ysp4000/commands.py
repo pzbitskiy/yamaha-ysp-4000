@@ -186,6 +186,7 @@ class YspResponseBase(YspResponseHandlerIf):
         remaining = data[i+1:]
 
         if complete:
+            logging.debug('recv cmd: %s', self.buf)
             # parse the entire buffer
             pos = 0
             for key, value in self.layout().items():
