@@ -204,6 +204,8 @@ class YspResponseBase(YspResponseHandlerIf):
             # parse the entire buffer
             pos = 0
             for key, value in self.layout().items():
+                size: int = None
+                handler: Callable[[bytes, bytes], None] = None
                 size, handler = value
                 if len(self.buf) < pos+size:
                     logger.debug('incomplete: exp %d, got %d bytes',
@@ -213,7 +215,7 @@ class YspResponseBase(YspResponseHandlerIf):
                 pos += size
                 self.fields[key] = elem
                 if handler:
-                    handler(elem)
+                    handler(self.buf, elem)
 
             self.buf = b''
             self.completed = True
@@ -250,7 +252,7 @@ class ConfigurationCommand(YspResponseBase):
         self.beam: Optional[str] = None
 
         _ = None
-        self.cmd_layout = {
+        self.cmd_layout: Dict[str, Tuple[int, Callable[[bytes, bytes], None]]] = {
             'start': (1, _),
             'type':  (5, _),
             'ver':   (1, _),
@@ -279,32 +281,40 @@ class ConfigurationCommand(YspResponseBase):
             beam=self.beam,
         )
 
-    def _parse_len(self, data: bytes):
+    def _parse_len(self, buf: bytes, chunk: bytes):
         """Parse variable len field"""
-        data_len = int(data, 16)
+        data_len = int(chunk, 16)
         existing = self.cmd_layout['data']
         self.cmd_layout['data'] = (data_len, existing[1])
 
-    def _parse_data(self, data: bytes):
+        # max documented data is 145 bytes but YSP400 might report data size = 147
+        total = sum(val[0] for val in self.cmd_layout.values())
+        if total > len(buf):
+            max_data_len = 144
+            logger.debug(
+                'config cmd fixup: %d > %d: %d -> %d', total, len(buf), data_len, max_data_len)
+            self.cmd_layout['data'] = (max_data_len, existing[1])
+
+    def _parse_data(self, _: bytes, chunk: bytes):
         """Parse DT items"""
-        if len(data) > self.DT7_SYSTEM:
+        if len(chunk) > self.DT7_SYSTEM:
             # 0: OK / 1: Busy / 2: P-Off
-            self.status = chr(data[self.DT7_SYSTEM])
-        if len(data) > self.DT8_POWER:
+            self.status = chr(chunk[self.DT7_SYSTEM])
+        if len(chunk) > self.DT8_POWER:
             # 0: Off / 1: On
-            self.power = chr(data[self.DT8_POWER])
-        if len(data) > self.DT9_INPUT:
+            self.power = chr(chunk[self.DT8_POWER])
+        if len(chunk) > self.DT9_INPUT:
             # 0: TV/STB / 1: DVD / 2: AUX1 / 3: AUX2 / 4: AUX3 / 5 :DOCK / 6 :FM / 7 :XM
-            self.input = chr(data[self.DT9_INPUT])
-        if len(data) > self.DT13_VOLUME_LOW:
-            self.volume = data[self.DT12_VOLUME_HIGH: self.DT13_VOLUME_LOW+1].decode()
-        if len(data) > self.DT14_PROGRAM:
+            self.input = chr(chunk[self.DT9_INPUT])
+        if len(chunk) > self.DT13_VOLUME_LOW:
+            self.volume = chunk[self.DT12_VOLUME_HIGH: self.DT13_VOLUME_LOW+1].decode()
+        if len(chunk) > self.DT14_PROGRAM:
             # 0: Cinema DSP Off / 1: Movie Sci-Fi / 2: Movie Spectacle / 3: Movie Adventure
             # 4: Music Video / 5: Music Concert Hall / 6:Music Jazz Club / 7:Sports
-            self.program = chr(data[self.DT14_PROGRAM])
-        if len(data) > self.DT29_BEAM:
+            self.program = chr(chunk[self.DT14_PROGRAM])
+        if len(chunk) > self.DT29_BEAM:
             # 0: 5Beam / 1: ST+3Beam / 2: 3Beam / 3: Stereo / 4: Target
-            self.beam = chr(data[self.DT29_BEAM])
+            self.beam = chr(chunk[self.DT29_BEAM])
 
 
 class ReportCommand(YspResponseBase):
