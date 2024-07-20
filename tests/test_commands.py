@@ -4,7 +4,10 @@ from typing import Any, Callable
 import unittest
 
 from ysp4000.commands import ConfigurationCommand, ReportCommand, \
+    OperationCommand, SystemCommand, \
     make_response_parser
+
+from ysp4000.hfn import PowerMap, ProgramMap
 
 
 def whole_feeder(data: bytes, func: Callable, assertion: Any, no_remainder: bool = None) -> bytes:  # pylint: disable=unused-argument
@@ -245,3 +248,26 @@ class TestResponseParser(unittest.TestCase):
         self.assertEqual(ysp.kwargs['power'], '1')
         self.assertEqual(ysp.kwargs['input'], '0')
         self.assertEqual(ysp.kwargs['volume'], 'B2')
+
+
+class TestCommands(unittest.TestCase):
+    """Test Commands"""
+
+    def test_operation_command(self):
+        """Test op commands"""
+        cmd = OperationCommand.cmd(power='1')
+        self.assertEqual(cmd, b'\x020787E\03')
+
+        cmd = OperationCommand.cmd(power=PowerMap.off)
+        self.assertEqual(cmd, b'\x020787F\03')
+
+        cmd = OperationCommand.cmd(program='0')
+        self.assertEqual(cmd, b'\x020789B\03')
+
+        cmd = OperationCommand.cmd(program=ProgramMap.adventure)
+        self.assertEqual(cmd, b'\x0207EFB\03')
+
+    def test_system_command(self):
+        """Test system cmd"""
+        cmd = SystemCommand.cmd(volume=b'2C')
+        self.assertEqual(cmd, b'\x028302C\03')

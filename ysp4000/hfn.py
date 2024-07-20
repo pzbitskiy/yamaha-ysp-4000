@@ -4,11 +4,13 @@ from typing import Callable, Dict, Optional
 
 # pylint: disable=too-few-public-methods
 
+
 class MapperIf(ABC):
     """Mapper interface"""
     @abstractmethod
     def code_to_hfn(self, code: str) -> str:
         """Returns friendly name for a code"""
+
 
 class ProgramMap(MapperIf):
     """Program codes to human-friendly names mapping
@@ -26,6 +28,15 @@ class ProgramMap(MapperIf):
         'Music Jazz Club':    '6',
         'Sports':             '7',
     }
+
+    off = '0'
+    scifi = '1'
+    spectacle = '2'
+    adventure = '3'
+    clip = '4'
+    concert = '5'
+    jazz = '6'
+    sports = '7'
 
     ALIASES = {
         'sci-fi':       '1',
@@ -76,6 +87,9 @@ class PowerMap(MapperIf):
         'On':  '1',
     }
 
+    on = '1'
+    off = '0'
+
     def __init__(self):
         self.code_to_name: Dict[str, str] = {}
         for key, val in self.FRIENDLY_NAMES.items():
@@ -118,6 +132,11 @@ class BeamMap(MapperIf):
         'My Surround': '6',
     }
 
+    beam5 = '0'
+    stereo_beam3 = '1'
+    beam3 = '2'
+    stereo = '3'
+
     def __init__(self):
         self.code_to_name: Dict[str, str] = {}
         for key, val in self.FRIENDLY_NAMES.items():
@@ -143,6 +162,12 @@ class InputMap(MapperIf):
         'DAB':    '8',
     }
 
+    tv = '0'
+    dvd = '1'
+    aux1 = '2'
+    aux2 = '3'
+    aux3 = '4'
+
     def __init__(self):
         self.code_to_name: Dict[str, str] = {}
         for key, val in self.FRIENDLY_NAMES.items():
@@ -154,11 +179,16 @@ class InputMap(MapperIf):
 
 class VolumeMap(MapperIf):
     """Volume converter"""
+
     def __init__(self):
         pass
 
     def code_to_hfn(self, code: str) -> str:
-        pass
+        """Convert code to 0-99 percent value """
+
+    @staticmethod
+    def convert_pct(val: int) -> bytes:
+        """Convert percent 0-99 value to 00-EE bytestring code"""
 
 
 def make_hfn_mapper() -> Callable[[str, str], Optional[str]]:
@@ -171,6 +201,7 @@ def make_hfn_mapper() -> Callable[[str, str], Optional[str]]:
         'program': ProgramMap(),
         'beam':    BeamMap(),
     }
+
     def mapper(key: str, code: str) -> Optional[str]:
         mapper = mappers.get(key)
         if not mapper:
