@@ -10,6 +10,9 @@ from typing import Dict, Callable, List, Optional, Tuple
 # power on: b'\x02102001\x03'
 
 
+logger = logging.getLogger('cmd')
+
+
 class YspStateUpdatableIf(ABC):  # pylint: disable=too-few-public-methods
     """Ysp4000 interface for state updates declared here for typing support"""
     @abstractmethod
@@ -38,8 +41,10 @@ class YspResponseHandlerIf(ABC):
 
 class YspSerialCodes(Enum):
     """Common serial command start/end codes"""
+    NUL = b'\x00'
     STX = b'\x02'
     ETX = b'\x03'
+    DLE = b'\x10'
     DC1 = b'\x11'
     DC2 = b'\x12'
     DC3 = b'\x13'
@@ -61,7 +66,7 @@ class ReadyCommand(YspCommandIf):  # pylint: disable=too-few-public-methods
 
     @staticmethod
     def cmd(**kwargs) -> Optional[bytes]:
-        logging.debug('ready cmd: %s', ReadyCommand.CMD)
+        logger.debug('ready cmd: %s', ReadyCommand.CMD)
         return ReadyCommand.CMD
 
 
@@ -71,7 +76,7 @@ class ControlCommandBase(ABC):  # pylint: disable=too-few-public-methods
     def control_cmd(sw: bytes, data: bytes) -> bytes:  # pylint: disable=invalid-name
         """Constructs control cmd"""
         cmd = YspSerialCodes.STX.value + sw + data + YspSerialCodes.ETX.value
-        logging.debug('control cmd: %s', cmd)
+        logger.debug('control cmd: %s', cmd)
         return cmd
 
 
@@ -187,16 +192,22 @@ class YspResponseBase(YspResponseHandlerIf):
             if val == self.end_byte():
                 complete = True
                 break
+            if val in (ord(YspSerialCodes.NUL.value), ord(YspSerialCodes.DLE.value)):
+                # this is incomplete response to power off looks like
+                complete = True
+                break
         self.buf += data[:i+1]
         remaining = data[i+1:]
 
         if complete:
-            logging.debug('recv cmd: %s', self.buf)
+            logger.debug('parsed cmd: %s', self.buf)
             # parse the entire buffer
             pos = 0
             for key, value in self.layout().items():
                 size, handler = value
                 if len(self.buf) < pos+size:
+                    logger.debug('incomplete: exp %d, got %d bytes',
+                                 pos + size, len(self.buf))
                     break
                 elem = self.buf[pos:pos+size]
                 pos += size
@@ -336,7 +347,11 @@ class ReportCommand(YspResponseBase):
             kwargs['status'] = 'warning'
 
         elif rcmd == b'20':
-            kwargs['power'] = chr(rdata[1])
+            if rdata[1] >= ord('0'):
+                kwargs['power'] = chr(rdata[1])
+            else:
+                # handle incomplete cmd with rdata = b'0\x10', b'0\x00' by forcing to off
+                kwargs['power'] = '0'
 
         elif rcmd == b'21':
             kwargs['input'] = chr(rdata[1])

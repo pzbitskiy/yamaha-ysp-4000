@@ -249,6 +249,20 @@ class TestResponseParser(unittest.TestCase):
         self.assertEqual(ysp.kwargs['input'], '0')
         self.assertEqual(ysp.kwargs['volume'], 'B2')
 
+    def test_incomplete_poweroff(self):
+        """Test incomplete power off response is handled OK"""
+        def run(data: bytes, feeder: Callable):
+            ysp = MockUpdatable()
+            parser = make_response_parser(ysp)
+            feeder(data, parser.consume, self, no_remainder=True)
+            self.assertEqual(ysp.kwargs['power'], '0')
+
+        random.seed(None)
+        for cmd in [b'\x0210200\x00', b'\x0210200\x10']:
+            run(cmd, whole_feeder)
+            run(cmd, byte_feeder)
+            run(cmd, random_feeder)
+
 
 class TestCommands(unittest.TestCase):
     """Test Commands"""
