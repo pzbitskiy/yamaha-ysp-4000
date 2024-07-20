@@ -145,7 +145,7 @@ class Ysp4000:
     def set_stereo(self):
         """Set beam mode to stereo"""
         if self.state['beam'] != BeamMap.stereo:
-            self._write_cmd(OperationCommand.cmd(beam=BeamMap.stereo))
+            self._write_cmd(OperationCommand.cmd(beam=BeamMap.stereo_beam3))
 
     def set_input_tv(self):
         """Set input to TV"""
