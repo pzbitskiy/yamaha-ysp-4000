@@ -269,5 +269,5 @@ class TestCommands(unittest.TestCase):
 
     def test_system_command(self):
         """Test system cmd"""
-        cmd = SystemCommand.cmd(volume=b'2C')
+        cmd = SystemCommand.cmd(volume='2C')
         self.assertEqual(cmd, b'\x028302C\03')

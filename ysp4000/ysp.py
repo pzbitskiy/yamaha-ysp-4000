@@ -15,9 +15,6 @@ logging.basicConfig(level=logging.INFO)
 
 class Ysp4000:
     """Yamaha YSP4000 serial controller"""
-    INPUT_TV = '0'
-    INPUT_AUX1 = '2'
-
     def __init__(
         self,
         port: str = '/dev/ttyUSB0',
@@ -50,9 +47,11 @@ class Ysp4000:
         if verbose:
             logging.basicConfig(level=logging.DEBUG, force=True)
 
-    async def start(self, event_loop) -> Coroutine:
+    def start(self, event_loop) -> Coroutine:
         """Start serial port communication loop"""
+        logging.info('starting coroutine on serial %s', self._port)
         self._ser.port = self._port
+        self._ser.open()
 
         this = self
 

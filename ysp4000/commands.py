@@ -4,6 +4,11 @@ from enum import Enum
 import logging
 from typing import Dict, Callable, List, Optional, Tuple
 
+# Also seen these responses, support?
+# startup: system playback report b'\x02301009\x03' b'\x02301100\x03' b'\x02301001\x03'
+# power off incomplete b'\x0210200\x10  b'\x0210200\x00
+# power on: b'\x02102001\x03'
+
 
 class YspStateUpdatableIf(ABC):  # pylint: disable=too-few-public-methods
     """Ysp4000 interface for state updates declared here for typing support"""
@@ -74,9 +79,9 @@ class SystemCommand(YspCommandIf, ControlCommandBase):
     """Ysp4000 system command"""
 
     @staticmethod
-    def cmd(volume: bytes = None, **kwargs) -> Optional[bytes]:
+    def cmd(volume: str = None, **kwargs) -> Optional[bytes]:
         if volume is not None:
-            return ControlCommandBase.control_cmd(b'8', b'30' + volume)
+            return ControlCommandBase.control_cmd(b'8', b'30' + volume.encode())
         # others are not supported => noop
         return None
 
@@ -219,8 +224,8 @@ class ConfigurationCommand(YspResponseBase):
     DT7_SYSTEM = 7
     DT8_POWER = 8
     DT9_INPUT = 9
-    DT12_VOLUME_HIGH_NIBBLE = 12
-    DT13_VOLUME_LOW_NIBBLE = 13
+    DT12_VOLUME_HIGH = 12
+    DT13_VOLUME_LOW = 13
     DT14_PROGRAM = 14
     DT29_BEAM = 29
 
@@ -280,10 +285,8 @@ class ConfigurationCommand(YspResponseBase):
         if len(data) > self.DT9_INPUT:
             # 0: TV/STB / 1: DVD / 2: AUX1 / 3: AUX2 / 4: AUX3 / 5 :DOCK / 6 :FM / 7 :XM
             self.input = chr(data[self.DT9_INPUT])
-        if len(data) > self.DT13_VOLUME_LOW_NIBBLE:
-            high = chr(data[self.DT12_VOLUME_HIGH_NIBBLE])
-            low = chr(data[self.DT13_VOLUME_LOW_NIBBLE])
-            self.volume = high + low
+        if len(data) > self.DT13_VOLUME_LOW:
+            self.volume = data[self.DT12_VOLUME_HIGH: self.DT13_VOLUME_LOW+1].decode()
         if len(data) > self.DT14_PROGRAM:
             # 0: Cinema DSP Off / 1: Movie Sci-Fi / 2: Movie Spectacle / 3: Movie Adventure
             # 4: Music Video / 5: Music Concert Hall / 6:Music Jazz Club / 7:Sports
@@ -339,9 +342,7 @@ class ReportCommand(YspResponseBase):
             kwargs['input'] = chr(rdata[1])
 
         elif rcmd == b'26':
-            high = chr(rdata[0])
-            low = chr(rdata[1])
-            kwargs['volume'] = high + low
+            kwargs['volume'] = rdata.decode()
 
         elif rcmd == b'28':
             kwargs['program'] = chr(rdata[0])
