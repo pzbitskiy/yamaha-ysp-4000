@@ -6,8 +6,9 @@ from typing import Callable, Coroutine, Dict, Optional
 import serial
 import serial_asyncio
 
-from .commands import make_response_parser, ReadyCommand, OperationCommand, SystemCommand
-from .hfn import make_hfn_mapper, BeamMap, InputMap, PowerMap, ProgramMap, VolumeMap
+from ysp4000.commands import make_response_parser, ReadyCommand, OperationCommand, SystemCommand
+from ysp4000.hfn import make_hfn_mapper, BeamMap, InputMap, PowerMap, ProgramMap, \
+    ReportMap, VolumeMap
 
 
 def init_logging(level=None, **kwargs):
@@ -59,8 +60,8 @@ class Ysp4000:
         if verbose:
             init_logging(level=logging.DEBUG, force=True)
 
-    def start(self, event_loop) -> Coroutine:
-        """Start serial port communication loop"""
+    def get_async_coro(self, event_loop) -> Coroutine:
+        """Return coroutine for serial port communication loop"""
         logger.info('starting coroutine on serial %s', self._port)
         self._ser.port = self._port
         self._ser.open()
@@ -197,14 +198,3 @@ class Ysp4000:
 
         if self._callback is not None:
             self._callback(**updates)
-
-
-if __name__ == '__main__':
-    ioloop = asyncio.get_event_loop()
-    ysp = Ysp4000()
-
-    coro = ysp.start(ioloop)
-
-    ioloop.run_until_complete(coro)
-    ioloop.run_forever()
-    ioloop.close()
