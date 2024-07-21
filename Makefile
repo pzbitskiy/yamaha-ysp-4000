@@ -1,7 +1,7 @@
 all: lint tests
 
 lint:
-	PYTHONPATH=. ./.venv/bin/pylint ysp4000 tests
+	python3 -m pylint ysp4000 tests
 
 test:
-	PYTHONPATH=. ./.venv/bin/pytest tests
+	python3 -m pytest tests
