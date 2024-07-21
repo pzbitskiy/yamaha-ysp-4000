@@ -225,6 +225,20 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes
         logger.debug('set volume: %s', value)
         self._write_cmd(SystemCommand.cmd(volume=value))
 
+    @Decorators.ready
+    def volume_up(self):
+        """Increment volume by 3 pct"""
+        current = self.state.get('volume', '00')
+        value = min(int(VolumeMap().code_to_hfn(current)) + 3, 100)
+        self.set_volume_pct(value)
+
+    @Decorators.ready
+    def volume_down(self):
+        """Increment volume by 3 pct"""
+        current = self.state.get('volume', '00')
+        value = max(int(VolumeMap().code_to_hfn(current)) - 3, 0)
+        self.set_volume_pct(value)
+
     def update_state(self, **kwargs):
         """Update state"""
         updates = {}
