@@ -113,7 +113,8 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes
         self._write_cmd(cmd)
         data = self.read_all()
         logger.debug('communicated: %s -> %s', cmd, data)
-        self._response_parser.consume(data)
+        if data:
+            self._response_parser.consume(data)
 
     def _write_cmd(self, cmd: Optional[bytes]):
         """Helper function that writes optional command to serial port"""
@@ -127,9 +128,8 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes
         self._response_parser.consume(data)
 
     def read_all(self) -> bytes:
-        """Read all data from the port with 1s timeout and parses it updating its own state.
+        """Read and returns all data from the port with 1s timeout.
         This method should be used only when not running an event loop.
-        Returns all data read.
         """
         timeout = self._ser.timeout
         self._ser.timeout = 1
@@ -141,8 +141,6 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes
             buf += read
 
         self._ser.timeout = timeout
-        logger.debug('read all: %s', buf)
-        self._response_parser.consume(buf)
         return buf
 
     @property
