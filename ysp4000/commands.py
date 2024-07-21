@@ -65,7 +65,7 @@ class ReadyCommand(YspCommandIf):  # pylint: disable=too-few-public-methods
 
     @staticmethod
     def cmd(**kwargs) -> Optional[bytes]:
-        logger.debug('ready cmd: %s', ReadyCommand.CMD)
+        logger.info('ready cmd: %s', ReadyCommand.CMD)
         return ReadyCommand.CMD
 
 
@@ -75,7 +75,7 @@ class ControlCommandBase(ABC):  # pylint: disable=too-few-public-methods
     def control_cmd(sw: bytes, data: bytes) -> bytes:  # pylint: disable=invalid-name
         """Constructs control cmd"""
         cmd = YspSerialCodes.STX.value + sw + data + YspSerialCodes.ETX.value
-        logger.debug('control cmd: %s', cmd)
+        logger.info('control cmd: %s', cmd)
         return cmd
 
 
@@ -201,7 +201,7 @@ class YspResponseBase(YspResponseHandlerIf):
         remaining = data[i+1:]
 
         if complete:
-            logger.debug('parsed cmd: %s', self.buf)
+            logger.info('response: %s', self.buf)
             # parse the entire buffer
             pos = 0
             for key, value in self.layout().items():

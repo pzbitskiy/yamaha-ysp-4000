@@ -1,14 +1,14 @@
 """YSP4000 Serial controller"""
 import asyncio
 import logging
-from typing import Callable, Coroutine, Dict, Optional
+from typing import Callable, Coroutine, Dict, Optional, TypeAlias
 
 import serial
 import serial_asyncio
 
 from ysp4000.commands import make_response_parser, ReadyCommand, OperationCommand, SystemCommand
 from ysp4000.hfn import make_hfn_mapper, BeamMap, InputMap, PowerMap, ProgramMap, \
-    ReportMap, VolumeMap
+    ReportMap, StatusMap, VolumeMap
 
 
 def init_logging(level=None, **kwargs):
@@ -25,8 +25,28 @@ def init_logging(level=None, **kwargs):
 logger = logging.getLogger('ysp')
 
 
-class Ysp4000:
+Ysp4000TypeAlias: TypeAlias = 'Ysp4000'
+
+class Ysp4000:  # pylint: disable=too-many-instance-attributes
     """Yamaha YSP4000 serial controller"""
+    class Decorators:  # pylint: disable=too-few-public-methods
+        """Defines internal decorators"""
+        @staticmethod
+        def ready(func):
+            """Ysp ready decorator ensures YSP4000 is ready to communicate by
+            synchronously sending a ready command.
+            """
+            def wrapper(self: Ysp4000TypeAlias, *args, **kwargs):
+                # pylint: disable=protected-access
+                if not self._ready:
+                    logger.debug('not ready...')
+                    self.ser_transport.pause_reading()
+                    self.communicate(ReadyCommand.cmd())
+                    self.ser_transport.resume_reading()
+                    logger.debug('calling %s', func.__name__)
+                    self._write_cmd(SystemCommand.cmd(report=ReportMap.enable))
+                func(self, *args, **kwargs)
+            return wrapper
 
     def __init__(
         self,
@@ -57,6 +77,9 @@ class Ysp4000:
         self._response_parser = make_response_parser(self)
         self._hfn_mapper = make_hfn_mapper()
 
+        self.ser_transport: Optional[asyncio.Protocol] = None
+        self._ready: Optional[bool] = None
+
         if verbose:
             init_logging(level=logging.DEBUG, force=True)
 
@@ -73,7 +96,7 @@ class Ysp4000:
 
             def connection_made(self, transport):
                 self.transport = transport  # pylint: disable=attribute-defined-outside-init
-                this._connected()           # pylint: disable=protected-access
+                this.ser_transport = transport
 
             def data_received(self, data):
                 this._handle(data)          # pylint: disable=protected-access
@@ -82,16 +105,21 @@ class Ysp4000:
             event_loop, Protocol, self._ser)
         return coroutine
 
+    def communicate(self, cmd: bytes):
+        """Synchronously sends data to YSP4000 and parses result.
+        At the moment used during
+        initialization.
+        """
+        self._write_cmd(cmd)
+        data = self.read_all()
+        logger.debug('communicated: %s -> %s', cmd, data)
+        self._response_parser.consume(data)
+
     def _write_cmd(self, cmd: Optional[bytes]):
         """Helper function that writes optional command to serial port"""
         if cmd:
-            logger.debug('send %s', cmd)
+            logger.debug('sending %s', cmd)
             self._ser.write(cmd)
-
-    def _connected(self):
-        """Protocol callback on serial connection"""
-        self._write_cmd(ReadyCommand.cmd())
-        self._write_cmd(SystemCommand.cmd(report=ReportMap.enable))
 
     def _handle(self, data):
         """Protocol callback to handle data"""
@@ -113,73 +141,85 @@ class Ysp4000:
             buf += read
 
         self._ser.timeout = timeout
+        logger.debug('read all: %s', buf)
         self._response_parser.consume(buf)
         return buf
 
     @property
     def on(self) -> bool:
         """Returns True if YSP4000 is powered on"""
-        power_on = '1'
-        return self.state['power'] == power_on
+        return self.state['power'] == PowerMap.on
 
+    @Decorators.ready
     def power_on(self):
         """Power on the device"""
         if self.on:
             return
         self._write_cmd(OperationCommand.cmd(power=PowerMap.on))
 
+    @Decorators.ready
     def power_off(self):
         """Power off the device"""
-        if self.on:
+        if not self.on:
             return
         self._write_cmd(OperationCommand.cmd(power=PowerMap.off))
 
+    @Decorators.ready
     def set_5beam(self):
         """Set beam mode to 5Beam"""
         if self.state['beam'] != BeamMap.beam5:
             self._write_cmd(OperationCommand.cmd(beam=BeamMap.beam5))
 
+    @Decorators.ready
     def set_3beam(self):
         """Set beam mode to 3Beam"""
         if self.state['beam'] != BeamMap.beam3:
             self._write_cmd(OperationCommand.cmd(beam=BeamMap.beam3))
 
+    @Decorators.ready
     def set_stereo(self):
         """Set beam mode to stereo"""
         if self.state['beam'] != BeamMap.stereo:
             self._write_cmd(OperationCommand.cmd(beam=BeamMap.stereo_beam3))
 
+    @Decorators.ready
     def set_input_tv(self):
         """Set input to TV"""
         if self.state['input'] != InputMap.tv:
             self._write_cmd(OperationCommand.cmd(input=InputMap.tv))
 
+    @Decorators.ready
     def set_input_aux1(self):
         """Set input to AUX1"""
         if self.state['input'] != InputMap.aux1:
             self._write_cmd(OperationCommand.cmd(input=InputMap.aux1))
 
+    @Decorators.ready
     def set_dsp_off(self):
         """Turn off DSP"""
         if self.state['program'] != ProgramMap.off:
             self._write_cmd(OperationCommand.cmd(program=ProgramMap.off))
 
+    @Decorators.ready
     def set_dsp_cinema(self):
         """Set program to generic cinema"""
         if self.state['program'] != ProgramMap.adventure:
             self._write_cmd(OperationCommand.cmd(program=ProgramMap.adventure))
 
+    @Decorators.ready
     def set_dsp_music(self):
         """Set program to music"""
         if self.state['program'] != ProgramMap.concert:
             self._write_cmd(OperationCommand.cmd(program=ProgramMap.concert))
 
+    @Decorators.ready
     def set_volume_pct(self, value: int):
         """Set volume to 0-99 pct"""
         val: str = VolumeMap.convert_pct(value)
         logger.debug('set volume: %d(%s)', value, val)
         self._write_cmd(SystemCommand.cmd(volume=val))
 
+    @Decorators.ready
     def set_volume(self, value: str):
         """Set volume to absolute value 00-EE"""
         logger.debug('set volume: %s', value)
@@ -193,8 +233,15 @@ class Ysp4000:
             if old != new:
                 self.state[key] = new
                 updates[key] = self._hfn_mapper(key, new)
+            if key == 'status' and new == StatusMap.ok:
+                self._ready = True
+
         if updates:
             logger.debug('state updated: %s', updates)
 
         if self._callback is not None:
             self._callback(**updates)
+
+    def close(self):
+        """close the serial port"""
+        self._ser.close()
