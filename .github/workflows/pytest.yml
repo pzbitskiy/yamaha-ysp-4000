@@ -1,4 +1,4 @@
-name: Pylint
+name: PyTest
 
 on: [push]
 
@@ -17,7 +17,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pylint
+        pip install pytest
         pip install -r requirements.txt
-    - name: Running linter
-      run: pylint ysp4000 tests
+    - name: Running tests
+      run: pytest tests
