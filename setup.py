@@ -10,6 +10,7 @@ setup(name='yamaha-ysp-4000',
       license='MIT',
       packages=['ysp4000'],
       install_requires=install_requires,
+      python_requires='>=3.10',
       zip_safe=False,
       entry_points={
           'console_scripts': [
