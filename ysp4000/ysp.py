@@ -27,7 +27,7 @@ logger = logging.getLogger('ysp')
 
 Ysp4000TypeAlias: TypeAlias = 'Ysp4000'
 
-class Ysp4000:  # pylint: disable=too-many-instance-attributes
+class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     """Yamaha YSP4000 serial controller"""
     class Decorators:  # pylint: disable=too-few-public-methods
         """Defines internal decorators"""
@@ -73,7 +73,9 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes
             stopbits=serial.STOPBITS_ONE
         )
 
-        self._callback = callback
+        self._cbs = set()
+        if callback is not None:
+            self._cbs.add(callback)
         self._response_parser = make_response_parser(self)
         self._hfn_mapper = make_hfn_mapper()
 
@@ -251,9 +253,19 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes
         if updates:
             logger.debug('state updated: %s', updates)
 
-        if self._callback is not None:
-            self._callback(**updates)
+        for cb in self._cbs:
+            cb(**updates)
 
     def close(self):
         """close the serial port"""
         self._ser.close()
+
+    def register_state_update_cb(self, cb: Callable):
+        """Register state update callback function"""
+        if cb is not None:
+            self._cbs.add(cb)
+
+    def unregister_state_update_cb(self, cb: Callable):
+        """Unregister state update callback if exist"""
+        if cb is not None and cb in self._cbs:
+            self._cbs.remove(cb)
