@@ -1,4 +1,4 @@
-all: lint tests
+all: lint test
 
 lint:
 	python3 -m pylint ysp4000 tests

@@ -14,14 +14,14 @@ from ysp4000.hfn import make_hfn_mapper, BeamMap, InputMap, PowerMap, ProgramMap
 def init_logging(level=None, **kwargs):
     """init logging"""
     if not level:
-        level = logging.INFO
+        level = logging.WARNING
     logging.basicConfig(
         level=level,
         format='%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%dT%H:%M:%S',
         **kwargs)
 
-
+init_logging()
 logger = logging.getLogger('ysp')
 
 
@@ -52,7 +52,7 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self,
         port: str = '/dev/ttyUSB0',
         callback: Callable = None,
-        verbose: Optional[bool] = None
+        verbose: Optional[bool] = None,
     ):
 
         self.state: Dict[str: Optional[str]] = {
