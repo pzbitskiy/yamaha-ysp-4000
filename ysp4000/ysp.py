@@ -38,14 +38,29 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             """
             def wrapper(self: Ysp4000TypeAlias, *args, **kwargs):
                 # pylint: disable=protected-access
+
                 if not self._ready:
                     logger.debug('not ready...')
-                    self.ser_transport.pause_reading()
-                    self.communicate(ReadyCommand.cmd())
-                    self.ser_transport.resume_reading()
+                    if not self.async_mode and not self._ser:
+                        self._ser.port = self._port
+                        self._ser.open()
+
+                    if self.ser_transport:
+                        self.ser_transport.pause_reading()
+                    try:
+                        self.communicate(ReadyCommand.cmd())
+                    finally:
+                        if self.ser_transport:
+                            self.ser_transport.resume_reading()
                     logger.debug('calling %s', func.__name__)
                     self._write_cmd(SystemCommand.cmd(report=ReportMap.enable))
+
                 func(self, *args, **kwargs)
+
+                if not self.async_mode:
+                    if data := self.read_all():
+                        self._response_parser.consume(data)
+
             return wrapper
 
     def __init__(
@@ -80,6 +95,7 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._hfn_mapper = make_hfn_mapper()
 
         self.ser_transport: Optional[asyncio.Protocol] = None
+        self.async_mode: Optional[bool] = None
         self._ready: Optional[bool] = None
 
         if verbose:
@@ -99,6 +115,7 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             def connection_made(self, transport):
                 self.transport = transport  # pylint: disable=attribute-defined-outside-init
                 this.ser_transport = transport
+                this.async_mode = True
 
             def data_received(self, data):
                 this._handle(data)          # pylint: disable=protected-access
