@@ -52,7 +52,7 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
                     finally:
                         if self.ser_transport:
                             self.ser_transport.resume_reading()
-                    logger.debug('calling %s', func.__name__)
+                    logger.debug('ready called from %s', func.__name__)
                     self._write_cmd(SystemCommand.cmd(report=ReportMap.enable))
 
                 func(self, *args, **kwargs)
@@ -96,7 +96,7 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         self.ser_transport: Optional[asyncio.Protocol] = None
         self.async_mode: Optional[bool] = None
-        self._ready: Optional[bool] = None
+        self._ready: bool = False
 
         if verbose:
             init_logging(level=logging.DEBUG, force=True)
@@ -181,6 +181,10 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             return
         self._write_cmd(OperationCommand.cmd(power=PowerMap.off))
 
+        # it is possible YSP would not respond, so update state right in place
+        self.state['power'] = PowerMap.off
+        self._ready = False
+
     @Decorators.ready
     def set_5beam(self):
         """Set beam mode to 5Beam"""
@@ -260,12 +264,14 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         """Update state"""
         updates = {}
         for key, new in kwargs.items():
-            old = self.state.get('key')
+            old = self.state.get(key)
             if old != new:
                 self.state[key] = new
                 updates[key] = self._hfn_mapper(key, new)
             if key == 'status' and new == StatusMap.ok:
                 self._ready = True
+            if key == 'power' and new == PowerMap.off:
+                self._ready = False
 
         if updates:
             logger.debug('state updated: %s', updates)

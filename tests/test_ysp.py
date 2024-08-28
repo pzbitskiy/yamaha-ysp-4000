@@ -12,7 +12,7 @@ class TestYsp(unittest.TestCase):
         updates = {}
         def cb(**kwargs):
             nonlocal updates
-            updates = kwargs
+            updates.update(**kwargs)
 
         ysp = Ysp4000(callback=cb)
 
@@ -27,7 +27,7 @@ class TestYsp(unittest.TestCase):
 
         ysp.update_state(status='0', power='0')
 
-        self.assertTrue(ysp._ready)
+        self.assertFalse(ysp._ready)
         self.assertFalse(ysp.on)
 
         self.assertEqual(updates['status'], 'OK')
@@ -47,7 +47,7 @@ class TestYsp(unittest.TestCase):
 
         # check it does not fail with None callback
         ysp.register_state_update_cb(None)
-        ysp.update_state(status='0', power='1')
+        ysp.update_state(status='1', power='0')
 
         ysp.register_state_update_cb(cb1)
         ysp.register_state_update_cb(cb2)
@@ -67,7 +67,7 @@ class TestYsp(unittest.TestCase):
 
         ysp.update_state(status='0', power='0')
 
-        self.assertTrue(ysp._ready)
+        self.assertFalse(ysp._ready)
         self.assertFalse(ysp.on)
         self.assertEqual(len(ysp._cbs), 1)
 
