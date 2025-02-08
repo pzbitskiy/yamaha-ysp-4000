@@ -6,8 +6,8 @@ from typing import Callable, Coroutine, Dict, Optional, TypeAlias
 import serial
 import serial_asyncio
 
-from ysp4000.commands import make_response_parser, ReadyCommand, OperationCommand, SystemCommand
-from ysp4000.hfn import make_hfn_mapper, BeamMap, InputMap, PowerMap, ProgramMap, \
+from commands import make_response_parser, ReadyCommand, OperationCommand, SystemCommand
+from hfn import make_hfn_mapper, BeamMap, InputMap, PowerMap, MuteMap, ProgramMap, \
     ReportMap, StatusMap, VolumeMap
 
 
@@ -73,6 +73,7 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.state: Dict[str: Optional[str]] = {
             'status':  None,
             'power':   None,
+            'mute':   None,
             'input':   None,
             'volume':  None,
             'program': None,
@@ -171,6 +172,7 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     def power_on(self):
         """Power on the device"""
         if self.on:
+            print(f'self._write_cmd(OperationCommand.cmd(power=PowerMap.on))')
             return
         self._write_cmd(OperationCommand.cmd(power=PowerMap.on))
 
@@ -214,6 +216,18 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         """Set input to AUX1"""
         if self.state['input'] != InputMap.aux1:
             self._write_cmd(OperationCommand.cmd(input=InputMap.aux1))
+
+    @Decorators.ready
+    def set_mute_on(self):
+        """mute on"""
+        if self.state['mute'] != MuteMap.on:
+            self._write_cmd(OperationCommand.cmd(mute=MuteMap.on))
+
+    @Decorators.ready
+    def set_mute_off(self):
+        """mute off"""
+        if self.state['mute'] != MuteMap.off:
+            self._write_cmd(OperationCommand.cmd(mute=MuteMap.off))
 
     @Decorators.ready
     def set_dsp_off(self):
