@@ -99,7 +99,6 @@ class PowerMap(MapperIf):
     def code_to_hfn(self, code: str) -> str:
         return self.code_to_name.get(code)
 
-
 class StatusMap(MapperIf):
     """Power codes to human-friendly names mapping
     0: OK / 1: Busy / 2: P-Off (Standby)
@@ -199,6 +198,25 @@ class InputMap(MapperIf):
     def code_to_hfn(self, code: str) -> str:
         return self.code_to_name.get(code)
 
+class MuteMap(MapperIf):
+    """Mute codes to human-friendly names mapping
+    0: Off / 1: On
+    """
+    FRIENDLY_NAMES = {
+        'Off': '0',
+        'On':  '1',
+    }
+
+    on = '1'
+    off = '0'
+
+    def __init__(self):
+        self.code_to_name: Dict[str, str] = {}
+        for key, val in self.FRIENDLY_NAMES.items():
+            self.code_to_name[val] = key
+
+    def code_to_hfn(self, code: str) -> str:
+        return self.code_to_name.get(code)
 
 class VolumeMap(MapperIf):
     """Volume converter"""
@@ -243,6 +261,7 @@ def make_hfn_mapper() -> Callable[[str, str], Optional[str]]:
         'status':  StatusMap(),
         'power':   PowerMap(),
         'input':   InputMap(),
+        'mute':   MuteMap(),        
         'volume':  VolumeMap(),
         'program': ProgramMap(),
         'beam':    BeamMap(),

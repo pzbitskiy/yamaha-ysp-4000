@@ -112,6 +112,14 @@ class OperationCommand(YspCommandIf, ControlCommandBase):
             if (cmd := input_map.get(input_val)) is not None:
                 return ControlCommandBase.control_cmd(b'0', b'78' + cmd)
 
+        elif (mute := kwargs.get('mute')):
+            mute_map = {
+                '0': b'A3',  # offs
+                '1': b'A2',  # on
+            }
+            if cmd := mute_map.get(mute.lower()):
+                return ControlCommandBase.control_cmd(b'0', b'7E' + cmd)
+
         elif volume := kwargs.get('volume'):
             cmd = b'1E' if volume > 0 else b'1F' if volume < 0 else None  # up or down
             if cmd is not None:
@@ -124,7 +132,7 @@ class OperationCommand(YspCommandIf, ControlCommandBase):
             }
             if cmd := power_map.get(power.lower()):
                 return ControlCommandBase.control_cmd(b'0', b'78' + cmd)
-
+            
         elif (program := kwargs.get('program')):
             # 0: Cinema DSP Off / 1: Movie Sci-Fi / 2: Movie Spectacle / 3: Movie Adventure
             # 4: Music Video / 5: Music Concert Hall / 6:Music Jazz Club / 7:Sports
@@ -238,6 +246,7 @@ class ConfigurationCommand(YspResponseBase):
     DT7_SYSTEM = 7
     DT8_POWER = 8
     DT9_INPUT = 9
+    DT11_MUTE = 11
     DT12_VOLUME_HIGH = 12
     DT13_VOLUME_LOW = 13
     DT14_PROGRAM = 14
@@ -248,9 +257,11 @@ class ConfigurationCommand(YspResponseBase):
         self.status: Optional[str] = None
         self.power: Optional[str] = None
         self.input: Optional[str] = None
+        self.mute: Optional[str] = None
         self.volume: Optional[str] = None
         self.program: Optional[str] = None
         self.beam: Optional[str] = None
+
 
         _ = None
         self.cmd_layout: Dict[str, Tuple[int, Callable[[bytes, bytes], None]]] = {
@@ -277,9 +288,11 @@ class ConfigurationCommand(YspResponseBase):
             status=self.status,
             power=self.power,
             input=self.input,
+            mute=self.mute,
             volume=self.volume,
             program=self.program,
             beam=self.beam,
+
         )
 
     def _parse_len(self, buf: bytes, chunk: bytes):
@@ -307,6 +320,9 @@ class ConfigurationCommand(YspResponseBase):
         if len(chunk) > self.DT9_INPUT:
             # 0: TV/STB / 1: DVD / 2: AUX1 / 3: AUX2 / 4: AUX3 / 5 :DOCK / 6 :FM / 7 :XM
             self.input = chr(chunk[self.DT9_INPUT])
+        if len(chunk) > self.DT11_MUTE:
+            # 0: Off / 1: On
+            self.beam = chr(chunk[self.DT11_MUTE])
         if len(chunk) > self.DT13_VOLUME_LOW:
             self.volume = chunk[self.DT12_VOLUME_HIGH: self.DT13_VOLUME_LOW+1].decode()
         if len(chunk) > self.DT14_PROGRAM:
@@ -366,6 +382,10 @@ class ReportCommand(YspResponseBase):
 
         elif rcmd == b'21':
             kwargs['input'] = chr(rdata[1])
+
+        elif rcmd == b'23':
+            if rdata[1] >= ord('0'):
+                kwargs['mute'] = chr(rdata[1])
 
         elif rcmd == b'26':
             kwargs['volume'] = rdata.decode()
