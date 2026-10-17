@@ -77,3 +77,19 @@ class TestYsp(unittest.TestCase):
         # cb2 data updated
         self.assertEqual(updates2['status'], 'OK')
         self.assertEqual(updates2['power'], 'Off')
+
+    def test_set_input_dvd(self):
+        """Test DVD input command is sent only when the input changes"""
+        # pylint: disable=protected-access
+        ysp = Ysp4000()
+        ysp._ready = True
+        ysp.async_mode = True
+        sent = []
+        ysp._write_cmd = sent.append
+
+        ysp.set_input_dvd()
+        self.assertEqual(sent, [b'\x020784A\x03'])
+
+        ysp.update_state(input='1')
+        ysp.set_input_dvd()
+        self.assertEqual(len(sent), 1)

@@ -216,6 +216,12 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self._write_cmd(OperationCommand.cmd(input=InputMap.aux1))
 
     @Decorators.ready
+    def set_input_dvd(self):
+        """Set input to DVD"""
+        if self.state['input'] != InputMap.dvd:
+            self._write_cmd(OperationCommand.cmd(input=InputMap.dvd))
+
+    @Decorators.ready
     def set_dsp_off(self):
         """Turn off DSP"""
         if self.state['program'] != ProgramMap.off:
