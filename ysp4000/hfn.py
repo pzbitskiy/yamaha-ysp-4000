@@ -159,6 +159,7 @@ class BeamMap(MapperIf):
     stereo_beam3 = '1'
     beam3 = '2'
     stereo = '3'
+    stereo5 = '4'
 
     def __init__(self):
         self.code_to_name: Dict[str, str] = {}

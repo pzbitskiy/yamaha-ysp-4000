@@ -93,3 +93,19 @@ class TestYsp(unittest.TestCase):
         ysp.update_state(input='1')
         ysp.set_input_dvd()
         self.assertEqual(len(sent), 1)
+
+    def test_set_5ch_stereo(self):
+        """Test 5ch stereo command is sent only when the beam mode changes"""
+        # pylint: disable=protected-access
+        ysp = Ysp4000()
+        ysp._ready = True
+        ysp.async_mode = True
+        sent = []
+        ysp._write_cmd = sent.append
+
+        ysp.set_5ch_stereo()
+        self.assertEqual(sent, [b'\x0207EFF\x03'])
+
+        ysp.update_state(beam='4')
+        ysp.set_5ch_stereo()
+        self.assertEqual(len(sent), 1)

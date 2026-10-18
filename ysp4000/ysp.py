@@ -204,6 +204,12 @@ class Ysp4000:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self._write_cmd(OperationCommand.cmd(beam=BeamMap.stereo_beam3))
 
     @Decorators.ready
+    def set_5ch_stereo(self):
+        """Set beam mode to 5ch stereo"""
+        if self.state['beam'] != BeamMap.stereo5:
+            self._write_cmd(OperationCommand.cmd(beam=BeamMap.stereo5))
+
+    @Decorators.ready
     def set_input_tv(self):
         """Set input to TV"""
         if self.state['input'] != InputMap.tv:

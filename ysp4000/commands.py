@@ -154,7 +154,7 @@ class OperationCommand(YspCommandIf, ControlCommandBase):
             }
             if cmd := beam_map.get(beam):
                 return ControlCommandBase.control_cmd(b'0', b'78' + cmd)
-            if cmd == '4':  # 5ch stereo
+            if beam == '4':  # 5ch stereo
                 return ControlCommandBase.control_cmd(b'0', b'7EFF')
 
         return None
